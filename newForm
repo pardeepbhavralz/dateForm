@@ -1,0 +1,364 @@
+//index
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candidate Registration Form</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <form id="registrationForm" method="POST">
+        <div>
+            <label for="first_name">First Name:</label>
+            <input type="text" id="first_name" name="first_name">
+            <span id="error_first_name" style="color: red;"></span>
+        </div>
+        <div>
+            <label for="last_name">Last Name:</label>
+            <input type="text" id="last_name" name="last_name">
+            <span id="error_last_name" style="color: red;"></span>
+        </div>
+        <div>
+            <label for="dob">Date of Birth:</label>
+            <input type="date" id="dob" name="dob">
+            <span id="error_dob" style="color: red;"></span>
+        </div>
+        <div>
+            <label for="address">Address:</label>
+            <input type="text" id="address" name="address">
+        </div>
+        <div>
+            <label for="phone">Phone:</label>
+            <input type="text" id="phone" name="phone">
+            <span id="error_phone" style="color: red;"></span>
+        </div>
+        <div>
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email">
+            <span id="error_email" style="color: red;"></span>
+        </div>
+        <div>
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password">
+            <span id="error_password" style="color: red;"></span>
+        </div>
+        <div>
+            <button type="submit">Submit</button>
+        </div>
+    </form>
+
+    <script>
+    $(document).ready(function() {
+        $("#registrationForm").submit(function(event) {
+            event.preventDefault();
+
+            let firstName = $('#first_name').val();
+            let lastName = $('#last_name').val();
+            let phone = $('#phone').val();
+            let email = $('#email').val();
+            let dob = new Date($('#dob').val());
+            let age = new Date().getFullYear() - dob.getFullYear();
+            let valid = true;
+
+            $('#error_first_name, #error_last_name, #error_phone, #error_email').text('');
+
+            // Validation
+            if (firstName.length < 4) {
+                $('#error_first_name').text('First name must be at least 4 characters');
+                valid = false;
+            }
+            if (lastName.length < 4) {
+                $('#error_last_name').text('Last name must be at least 4 characters');
+                valid = false;
+            }
+            if (!/^\d{10}$/.test(phone)) {
+                $('#error_phone').text('Phone number must be exactly 10 digits');
+                valid = false;
+            }
+            if (!/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email)) {
+                $('#error_email').text('Invalid email format');
+                valid = false;
+            }
+            if (age < 18) {
+                alert('You must be at least 18 years old to register.');
+                valid = false;
+            }
+
+            if (valid) {
+                $.ajax({
+                    url: "function.php",
+                    type: "POST",
+                    data: $(this).serialize(),
+                    success: function(response) {
+                        if (response === "email_exists") {
+                            $("#error_email").text("Email already registered");
+                        } else if (response === "success") {
+                            window.location.href = "welcome.php"; 
+                        } else {
+                            alert(response); 
+                        }
+                    }
+                });
+            }
+        });
+    });
+    </script>
+</body>
+</html>
+//welcome
+<?php
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header("Location: index.php");
+    exit();
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registered Candidate</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h2>Last Registered Candidate</h2>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>First Name</th>
+                <th>Last Name</th>
+                <th>Date of Birth</th>
+                <th>Address</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="candidateList"></tbody>
+    </table>
+
+    <div id="editModal" style="display:none;">
+        <h3>Edit Candidate</h3>
+        <input type="hidden" id="candidateId">
+        <label>First Name:</label>
+        <input type="text" id="editFirstName"><br>
+        <label>Last Name:</label>
+        <input type="text" id="editLastName"><br>
+        <label>Date of Birth:</label>
+        <input type="date" id="editDOB"><br>
+        <label>Address:</label>
+        <input type="text" id="editAddress"><br>
+        <label>Phone:</label>
+        <input type="text" id="editPhone"><br>
+        <label>Email:</label>
+        <input type="email" id="editEmail"><br>
+        <button id="updateBtn">Update</button>
+    </div>
+
+    <button id="logoutBtn">Logout</button>
+
+    <script>
+    $(document).ready(function() {
+        function fetchData() {
+            $.ajax({
+                url: 'function.php',
+                type: 'POST',
+                data: { action: 'fetch_last_data' },
+                success: function(response) {
+                    let candidate = JSON.parse(response);
+                    let row = `<tr>
+                        <td>${candidate.firstname}</td>
+                        <td>${candidate.lastname}</td>
+                        <td>${candidate.dob}</td>
+                        <td>${candidate.address}</td>
+                        <td>${candidate.phone}</td>
+                        <td>${candidate.email}</td>
+                        <td>
+                            <button class="editBtn" data-id="${candidate.id}">Edit</button>
+                        </td>
+                    </tr>`;
+                    $('#candidateList').html(row);
+                }
+            });
+        }
+
+        fetchData(); 
+
+        // edit
+        $(document).on('click', '.editBtn', function() {
+            const id = $(this).data('id');
+            $.ajax({
+                url: 'function.php',
+                type: 'POST',
+                data: { action: 'get_candidate', id: id },
+                success: function(response) {
+                    const candidate = JSON.parse(response);
+                    $('#candidateId').val(candidate.id);
+                    $('#editFirstName').val(candidate.firstname);
+                    $('#editLastName').val(candidate.lastname);
+                    $('#editDOB').val(candidate.dob);
+                    $('#editAddress').val(candidate.address);
+                    $('#editPhone').val(candidate.phone);
+                    $('#editEmail').val(candidate.email);
+                    $('#editModal').show();
+                }
+            });
+        });
+
+        // Update 
+        $('#updateBtn').click(function() {
+            const id = $('#candidateId').val();
+            const firstName = $('#editFirstName').val();
+            const lastName = $('#editLastName').val();
+            const dob = $('#editDOB').val();
+            const address = $('#editAddress').val();
+            const phone = $('#editPhone').val();
+            const email = $('#editEmail').val();
+
+            // check email
+            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailPattern.test(email)) {
+                alert("Please enter a valid email address.");
+                return;
+            }
+
+            // check age
+            const birthDate = new Date(dob);
+            const age = new Date().getFullYear() - birthDate.getFullYear();
+            const m = new Date().getMonth() - birthDate.getMonth();
+            if (m < 0 || (m === 0 && new Date().getDate() < birthDate.getDate())) {
+                age--;
+            }
+
+            if (age < 18) {
+                alert("You must be at least 18 years old.");
+                return;
+            }
+
+            $.ajax({
+                url: 'function.php',
+                type: 'POST',
+                data: {
+                    action: 'update_candidate',
+                    id: id,
+                    first_name: firstName,
+                    last_name: lastName,
+                    dob: dob,
+                    address: address,
+                    phone: phone,
+                    email: email
+                },
+                success: function(response) {
+                    alert(response);
+                    $('#editModal').hide();
+                    fetchData();
+                }
+            });
+        });
+
+        // Logout
+        $('#logoutBtn').click(function() {
+            $.ajax({
+                url: 'function.php',
+                type: 'POST',
+                data: { action: 'logout' },
+                success: function(response) {
+                    window.location.href = 'index.php'; 
+                }
+            });
+        });
+    });
+    </script>
+</body>
+</html>
+//function
+<?php
+session_start();
+$host = "localhost";
+$username = "root"; 
+$password = ""; 
+$database = "test";
+
+$conn = new mysqli($host, $username, $password, $database);
+
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['action']) && $_POST['action'] === 'fetch_last_data') {
+        $sql = "SELECT * FROM dateform ORDER BY id DESC LIMIT 1"; 
+        $result = $conn->query($sql);
+        $data = $result->fetch_assoc();
+        echo json_encode($data);
+    }
+
+    if (isset($_POST['action']) && $_POST['action'] === 'get_candidate') {
+        $id = $_POST['id'];
+        $sql = "SELECT * FROM dateform WHERE id = $id"; 
+        $result = $conn->query($sql);
+        $data = $result->fetch_assoc();
+        echo json_encode($data);
+    }
+
+    if (isset($_POST['action']) && $_POST['action'] === 'update_candidate') {
+        $id = $_POST['id'];
+        $firstName = $conn->real_escape_string($_POST['first_name']);
+        $lastName = $conn->real_escape_string($_POST['last_name']);
+        $dob = $_POST['dob'];
+        $address = $conn->real_escape_string($_POST['address']);
+        $phone = $conn->real_escape_string($_POST['phone']);
+        $email = $conn->real_escape_string($_POST['email']);
+
+        $sql = "UPDATE dateform SET firstname='$firstName', lastname='$lastName', dob='$dob', address='$address', phone='$phone', email='$email' WHERE id=$id";
+        if ($conn->query($sql) === TRUE) {
+            echo "Candidate updated successfully!";
+        } else {
+            echo "Error updating record: " . $conn->error;
+        }
+    }
+
+    if (isset($_POST['action']) && $_POST['action'] === 'logout') {
+        session_destroy();
+        echo "Logged out successfully!";
+    }
+
+    if (isset($_POST['first_name']) && isset($_POST['email'])) {
+        //email check
+        $email = $conn->real_escape_string($_POST['email']);
+        $checkEmailQuery = "SELECT * FROM dateform WHERE email='$email'";
+        $result = $conn->query($checkEmailQuery);
+        if ($result->num_rows > 0) {
+            echo "email_exists";
+            exit();
+        }
+
+        // Insert 
+        $firstName = $conn->real_escape_string($_POST['first_name']);
+        $lastName = $conn->real_escape_string($_POST['last_name']);
+        $dob = $_POST['dob'];
+        $address = $conn->real_escape_string($_POST['address']);
+        $phone = $conn->real_escape_string($_POST['phone']);
+        $password = password_hash($_POST['password'], PASSWORD_BCRYPT);
+
+        $sql = "INSERT INTO dateform (firstname, lastname, dob, address, phone, email, password) VALUES ('$firstName', '$lastName', '$dob', '$address', '$phone', '$email', '$password')";
+        if ($conn->query($sql) === TRUE) {
+            $_SESSION['user_id'] = $conn->insert_id;
+            echo "success";
+        } else {
+            echo "Error: " . $sql . "<br>" . $conn->error;
+        }
+    }
+
+    $conn->close();
+}
+?>
+//logout
+<?php
+session_start();
+session_destroy(); 
+header("Location: index.php"); 
+exit();
+?>
